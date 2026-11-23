@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SAINT SEVEN · 성녀의 희생</title>
+  <link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/viewport.css"><link rel="stylesheet" href="css/ending.css"><link rel="stylesheet" href="css/audio.css"><link rel="stylesheet" href="css/evidence.css">
+  <script defer src="js/data.js"></script><script defer src="js/model.js"></script>
+  <script defer src="js/story.js"></script><script defer src="js/narrative.js"></script><script defer src="js/cinematic.js"></script><script defer src="js/audio-score.js"></script><script defer src="js/audio.js"></script><script defer src="js/sprites.js"></script><script defer src="js/portals.js"></script><script defer src="js/surfaces.js"></script><script defer src="js/endings.js"></script><script defer src="js/audio-panel.js"></script><script defer src="js/game.js"></script><script defer src="js/layout.js"></script>
+</head>
+<body>
+<div class="page">
+  <header class="masthead"><div class="title-lockup"><p class="eyebrow">한 사람의 희생에 동의한다는 것</p><h1>SAINT <span>SEVEN</span></h1></div><span class="version">v0.6</span></header>
+  <main class="layout">
+    <aside class="sidebar">
+      <section class="side-card"><p class="eyebrow">판단의 흔적</p><div class="meters">
+        <div class="meter"><h2>엘리<br>의심도</h2><div id="suspicionBar" class="segments" role="meter" aria-label="엘리 의심도" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"></div><span id="suspicionValue">0 / 5</span></div>
+        <div class="meter"><h2>엘리<br>신뢰도</h2><div id="trustBar" class="segments trust" role="meter" aria-label="엘리 신뢰도" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"></div><span id="trustValue">0 / 5</span></div>
+      </div><p class="small" id="meterNote">조사가 시작되면<br>판단이 기록됩니다.</p></section>
+      <section class="side-card current-goal"><p class="eyebrow">현재 목표</p><p id="objective">이야기를 시작하세요.</p><span id="clueCount" class="small">단서 0 / 6</span></section>
+      <button class="button secondary" id="journalButton">탐색 기록 · Q</button><button class="button secondary" id="mapButton">장소 안내</button><button class="button secondary" id="menuButton">메뉴 · Esc</button><button class="button secondary" id="bgmButton" aria-pressed="true" aria-label="전체 소리 켜짐">AUDIO ON</button>
+    </aside>
+    <section class="game-panel" aria-label="SAINT SEVEN 게임">
+      <div class="scene-bar"><span class="scene-meta" id="chapterName">PROLOGUE</span><span class="scene-location"><i class="location-dot"></i><strong id="locationName">성당 내부</strong></span><span id="sceneStatus">장면 준비 중</span></div>
+      <div class="stage" id="stage">
+        <canvas id="gameCanvas" width="960" height="640" tabindex="0" aria-label="WASD 또는 방향키로 이동, E키로 대화와 조사">Canvas 지원 브라우저에서 실행해 주세요.</canvas>
+        <div class="vignette"></div>
+        <div class="loading" id="loading"><span class="loading-mark">✦</span><p id="loadingText">모노아이에 도착하는 중…</p></div>
+        <section class="screen-overlay title-screen" id="titleScreen"><p class="eyebrow">MONOAI · ERTEN EMPIRE</p><h2>SAINT<br><span>SEVEN</span></h2><div class="ornament">✦</div><p>한 사람의 희생에 동의한다는 것</p><button class="button" id="startButton">이야기 시작</button><button class="text-button" id="helpButton">조작 안내</button></section>
+        <div class="interaction-hint" id="interactionHint" hidden></div><div class="toast" id="toast" role="status" hidden></div>
+        <div class="full-figure" id="fullFigure" hidden aria-hidden="true"><svg id="fullSVG" xmlns="http://www.w3.org/2000/svg"><image id="fullImage" width="1789" height="2048"/></svg></div>
+        <section class="dialogue" id="dialogue" aria-label="대화" hidden>
+          <div class="portrait-wrap" id="portraitWrap"><svg id="portraitSVG" preserveAspectRatio="xMidYMin slice" xmlns="http://www.w3.org/2000/svg" role="img"><title id="portraitAlt"></title><image id="portraitImage" width="1789" height="2048"/></svg></div>
+          <div class="dialogue-body"><div class="dialogue-top"><h2 id="speaker"></h2><span id="dialogueCounter"></span></div><p id="dialogueText" aria-live="polite"></p><div class="dialogue-actions" id="dialogueActions"></div><p id="dialogueDefer" class="dialogue-defer" hidden></p></div>
+        </section>
+        <div class="transition-layer" id="transition" hidden><p id="transitionText"></p></div>
+        <section class="cinematic-caption" id="cinematicCaption" aria-label="의식 장면" hidden><div role="status" aria-live="polite"><h2 id="cinematicHeading"></h2><p id="cinematicLine"></p></div><button class="text-button" id="skipCinematic">장면 건너뛰기 · Enter</button></section>
+        <section class="screen-overlay ending-screen" id="endingScreen" hidden><p class="eyebrow" id="endingType"></p><div class="ornament">✦</div><h2 id="endingTitle"></h2><p id="endingText"></p><button class="button" id="reflectionButton">내 선택 돌아보기</button><button class="text-button" id="endingRestart">다시 시작</button></section>
+      </div>
+      <footer class="controls"><span><kbd>WASD</kbd> / <kbd>↑↓←→</kbd> 이동</span><span><kbd>E</kbd> 대화 · 조사</span><span><kbd>Enter</kbd> 대사 넘기기</span><span><kbd>Q</kbd> 기록</span><span>문에 닿으면 자동 이동</span></footer>
+    </section>
+  </main>
+  <footer class="page-footer"><p>JETHAN JANG · SAINT SEVEN</p></footer>
+</div>
+<dialog class="modal" id="journalModal" aria-labelledby="journalTitle"><div class="modal-heading"><h2 id="journalTitle">탐색 기록</h2><button class="icon-button" id="closeJournal" aria-label="기록 닫기">×</button></div><div id="journalEntries"></div><p class="modal-note">Q 또는 Esc로 돌아가기</p></dialog>
+<dialog class="modal" id="pauseModal" aria-labelledby="pauseTitle"><p class="eyebrow">SAINT SEVEN</p><h2 id="pauseTitle">잠시 멈춤</h2><div class="modal-buttons"><button class="button" id="resumeButton">계속하기</button><button class="button secondary" id="audioSettingsButton">소리 설정</button><button class="button secondary" id="pauseHelp">조작 안내</button><button class="button secondary" id="resetButton">처음부터 다시 시작</button></div><p class="small" id="resetNotice" hidden>진행 중인 이야기가 초기화됩니다. 한 번 더 눌러 주세요.</p></dialog>
+<dialog class="modal" id="infoModal" aria-labelledby="infoTitle"><h2 id="infoTitle"></h2><div id="infoContent"></div><div class="modal-buttons" id="infoActions"></div></dialog>
+</body>
+</html>
