@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SAINT SEVEN · 교수 피드백 검증</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;padding:16px;background:#11170d;color:#f4eedc;font:14px/1.6 monospace}h1{font-size:20px;font-weight:400;margin:0 0 10px;color:#e7cf91}button{padding:9px 15px;border:1px solid #c9aa60;background:#2b321c;color:#f4eedc;font:inherit;cursor:pointer}button:disabled{opacity:.5}nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}#run{background:#c9aa60;color:#1b2011}#summary{display:block;font-size:16px;color:#e7cf91;margin:8px 0}#result{max-height:220px;overflow:auto;white-space:pre-wrap;background:#1b2011;padding:12px;border:1px solid #5b603b;margin:10px 0}#preview{position:relative;width:100%;overflow:hidden;border:1px solid #c9aa60}iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;max-width:none}#inspection{white-space:pre-wrap;color:#d3cdb7;margin:8px 0}details{margin:8px 0}table{border-collapse:collapse;width:100%;font-size:12px}td,th{text-align:left;padding:5px;border:1px solid #5b603b}.pass{color:#bdd29c}.fail{color:#eab09b}
+</style>
+<h1>SAINT SEVEN · 교수 피드백 검증</h1>
+<nav><button id="run">전체 검증 실행</button><button data-size="1920,1080">1920 × 1080</button><button data-size="1440,900">1440 × 900</button><button data-size="1366,768">1366 × 768</button><button data-size="1280,720">1280 × 720</button></nav>
+<output id="summary">게임을 불러오는 중입니다.</output>
+<pre id="result" aria-live="polite"></pre>
+<details><summary>해상도별 측정 결과</summary><table><thead><tr><th>장면</th><th>실제 표시 영역</th><th>문서 스크롤</th><th>대사 폰트</th><th>게임 영역</th></tr></thead><tbody id="metrics"></tbody></table></details>
+<p id="inspection"></p><div id="preview"><iframe id="game" title="검증 중인 게임" src="../index.html?__test=1"></iframe></div>
+<script>
+'use strict';
+const frame=document.querySelector('#game'),out=document.querySelector('#result'),summary=document.querySelector('#summary'),metrics=document.querySelector('#metrics'),preview=document.querySelector('#preview');
+const sizes=[[1920,1080],[1440,900],[1366,768],[1280,720]],wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+let w,d,api,currentSize=[1280,720],running=false,rows=[],errors=[],layoutErrors=[];
+const assert=(v,message)=>{if(!v)throw Error(message);};
+function log(message){out.textContent+=message+'\n';out.scrollTop=out.scrollHeight;}
+async function until(fn,message='기다리기 시간 초과',timeout=22000){const start=performance.now();while(performance.now()-start<timeout){if(fn())return;await wait(40);}throw Error(message);}
+function scalePreview(){const scale=Math.min(1,preview.clientWidth/currentSize[0]);frame.style.transform='scale('+scale+')';preview.style.height=Math.ceil(currentSize[1]*scale)+'px';document.querySelector('#inspection').textContent='게임 내부의 실제 viewport: '+currentSize.join(' × ')+' CSS px / 검토 화면 배율 '+Math.round(scale*100)+'%';}
+async function resize(size){
+  currentSize=[...size];frame.style.width=size[0]+'px';frame.style.height=size[1]+'px';scalePreview();
+  await until(()=>w.innerWidth===size[0]&&w.innerHeight===size[1],'iframe 크기 적용 실패',5000);
+  w.SAINT_LAYOUT?.refresh();
+  // A resized iframe can report its new viewport before the game's scheduled
+  // layout frame runs. Wait for its CSS viewport and two stable rendered frames;
+  // do not wait for overflow to disappear, which would conceal a layout defect.
+  await new Promise((resolve,reject)=>{
+    let request=0,previous='',stable=0,latest=null,finished=false;
+    const finish=error=>{if(finished)return;finished=true;clearTimeout(timeout);w.cancelAnimationFrame(request);error?reject(error):resolve();};
+    const timeout=setTimeout(()=>finish(Error('레이아웃 적용/안정화 시간 초과: '+JSON.stringify({expected:size,actual:latest}))),12000);
+    const sample=()=>{
+      if(finished)return;
+      try{
+        const css=w.getComputedStyle(d.documentElement),body=d.body.getBoundingClientRect();
+        latest={viewport:[w.innerWidth,w.innerHeight],css:[parseFloat(css.getPropertyValue('--app-width')),parseFloat(css.getPropertyValue('--app-height'))],body:[body.width,body.height]};
+        const applied=latest.viewport.every((v,i)=>v===size[i])&&latest.css.every((v,i)=>Math.abs(v-size[i])<1)&&latest.body.every((v,i)=>Math.abs(v-size[i])<1);
+        const geometry=[...d.querySelectorAll('.page,.layout,.game-panel,#stage,#dialogue,#fullFigure,dialog[open]')].filter(rendered).map(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height,el.scrollWidth,el.scrollHeight].map(v=>Math.round(v*100)/100);});
+        const signature=JSON.stringify(geometry);
+        stable=applied&&signature===previous?stable+1:0;previous=signature;
+        if(applied&&stable>=2)return finish();
+        request=w.requestAnimationFrame(sample);
+      }catch(error){finish(error);}
+    };
+    request=w.requestAnimationFrame(sample);
+  });
+}
+function bind(){w=frame.contentWindow;d=w.document;api=w.SAINT_TEST;}
+function rendered(el){if(!el||!el.getClientRects().length)return false;for(let n=el;n&&n.nodeType===1;n=n.parentElement){const s=w.getComputedStyle(n);if(n.hidden||s.display==='none'||s.visibility==='hidden')return false;}return true;}
+function inside(el,label){if(!rendered(el))return;const r=el.getBoundingClientRect(),tol=2;assert(r.left>=-tol&&r.top>=-tol&&r.right<=w.innerWidth+tol&&r.bottom<=w.innerHeight+tol,label+' 화면 이탈: '+JSON.stringify({x:r.x,y:r.y,width:r.width,height:r.height}));}
+function textFits(el,label){if(!rendered(el))return;inside(el,label);assert(el.scrollWidth<=el.clientWidth+2,label+' 가로 글자 잘림');assert(el.scrollHeight<=el.clientHeight+2,label+' 세로 글자 잘림');}
+function inspectLayout(label){
+  const root=d.documentElement,body=d.body;
+  const x=Math.max(root.scrollWidth,body.scrollWidth)-w.innerWidth,y=Math.max(root.scrollHeight,body.scrollHeight)-w.innerHeight;
+  assert(x<=2&&y<=2,label+' 페이지 스크롤: '+x+' × '+y);
+  for(const selector of ['.page','.masthead','.layout','.sidebar','.game-panel','#stage','#gameCanvas','#dialogue','#portraitWrap','#fullFigure','#titleScreen','#endingScreen','#cinematicCaption','.controls','dialog[open]'])for(const el of d.querySelectorAll(selector))inside(el,label+' '+selector);
+  for(const selector of ['#dialogueText','#speaker','#objective','#locationName','#meterNote','#clueCount','.meter h2','.meter>span','.dialogue-actions button','.scene-bar>span','.sidebar>.button','.controls','#titleScreen>p','#titleScreen>h2','#titleScreen>button','#endingScreen>p','#endingScreen>h2','#endingScreen>button','#cinematicHeading','#cinematicLine','dialog[open] p','dialog[open] h2','dialog[open] h3','dialog[open] button','.layout-page-navigation'])for(const el of d.querySelectorAll(selector))textFits(el,label+' '+selector);
+  const canvas=d.querySelector('#gameCanvas'),cs=w.getComputedStyle(canvas),r=canvas.getBoundingClientRect();
+  assert(cs.imageRendering==='pixelated'||cs.imageRendering==='crisp-edges','픽셀 보간 설정 누락');
+  assert(cs.objectFit==='contain'||Math.abs(r.width/r.height-canvas.width/canvas.height)<.015,'캔버스 종횡비 왜곡');
+  const dialogueFont=parseFloat(w.getComputedStyle(d.querySelector('#dialogueText')).fontSize);
+  if(!d.querySelector('#dialogue').hidden)assert(dialogueFont>=17.5,'대사 폰트가 작음: '+dialogueFont+'px');
+  const sr=d.querySelector('#stage').getBoundingClientRect();
+  rows.push({label,size:currentSize.join(' × '),scroll:x+' / '+y,font:dialogueFont,stage:Math.round(sr.width)+' × '+Math.round(sr.height)});
+}
+function recordLayoutError(label,error){
+  const entry={label,size:currentSize.join(' × '),message:error.message};layoutErrors.push(entry);
+  document.documentElement.dataset.layoutErrors=String(layoutErrors.length);
+  summary.textContent='검증 계속 중 · 화면 오류 '+layoutErrors.length+'건';summary.className='fail';
+  log('FAIL · 화면 '+entry.size+' / '+label+' / '+error.message);
+}
+function inspectAndCollect(label){
+  try{inspectLayout(label);return true;}catch(error){recordLayoutError(label,error);return false;}
+}
+async function layouts(label){
+  const before=layoutErrors.length;
+  for(const size of sizes){await resize(size);inspectAndCollect(label);}
+  if(layoutErrors.length===before)log('PASS · '+label+' / 모든 해상도 경계·글자·비율');
+  else log('FAIL · '+label+' / 화면 오류 '+(layoutErrors.length-before)+'건 기록, 다음 장면 검증 계속');
+}
+function renderMetrics(){metrics.replaceChildren();for(const r of rows){const tr=document.createElement('tr');for(const value of [r.label,r.size,r.scroll,r.font+' px',r.stage]){const td=document.createElement('td');td.textContent=value;tr.append(td);}metrics.append(tr);}}
+function key(code,type='keydown'){d.querySelector('#gameCanvas').dispatchEvent(new w.KeyboardEvent(type,{code,bubbles:true}));}
+function closeInfo(){const m=d.querySelector('#infoModal');if(m.open)d.querySelector('#infoActions button').click();}
+function closeModal(id){const m=d.getElementById(id);if(m.open){key('Escape');assert(!m.open,id+' 닫기 실패');}}
+function advanceAll(){for(let i=0;i<100;i++){const s=api.snapshot();if(!s.dialogue||s.busy)break;if(s.dialogue.index===s.dialogue.total-1&&s.dialogue.choices.length)break;api.advance();}}
+async function storyDoorLock(mapId,exitId,phase){
+  const def=w.SAINT_PORTALS.entries(mapId).find(p=>p.id===exitId),key=mapId+':'+exitId;
+  assert(def?.approach,'진행 제한 문 좌표 없음 '+key);assert(api.go(mapId,def.approach),'진행 제한 문 접근 실패 '+key);await wait(750);
+  for(let i=0;i<85&&!api.snapshot().portals.blocked.includes(key);i++){
+    api.testMove(def.inward[0]*4,def.inward[1]*4);
+    assert(api.snapshot().world===mapId,'스토리 진행 전 문이 열림 '+key);
+  }
+  const s=api.snapshot();assert(s.portals.blocked.includes(key),'진행 제한 문 접촉 판정 누락 '+key);assert(s.world===mapId&&s.game.phase===phase,'자동 입장으로 기존 스토리 단계 변경 '+key);
+  log('PASS · '+phase+' 단계 '+key+' 자동 입장 제한 유지');
+}
+async function intro(choice,check=false){
+  api.reset();if(check)await layouts('타이틀');api.start();if(check)await layouts('엘리 대화·초상화');
+  const cast=api.snapshot().cast.join(',');assert(new Set(api.snapshot().cast).size===6,'주민 외형 중복');advanceAll();
+  await until(()=>api.snapshot().dialogue?.total===4&&!api.snapshot().busy,'미사 후 개인 대화');advanceAll();if(check)await layouts('진행 안내창');closeInfo();
+  assert(api.snapshot().game.phase==='seven','세븐 만남 단계');if(check)await storyDoorLock('entrance','square_out','seven');api.go('entrance',{x:501,y:290});api.interact();if(check)await layouts('세븐 대화·초상화');advanceAll();
+  await until(()=>api.snapshot().game.phase==='gossip'&&!api.snapshot().busy,'세븐 퇴장 완료');advanceAll();closeInfo();
+  if(check)await storyDoorLock('square','house_out','gossip');api.go('square',{x:455,y:365});assert(api.snapshot().cast.join(',')===cast,'맵 이동 후 주민 외형 변동');api.interact();advanceAll();
+  assert(api.snapshot().game.phase==='elder','주민 소문 단계');api.go('square',{x:925,y:720});api.interact();advanceAll();
+  assert(api.snapshot().dialogue.choices.length===2,'네/침묵 선택지 유지');if(check)await layouts('네·침묵 선택지');api.choose(choice);advanceAll();closeInfo();
+  assert(api.snapshot().game.phase==='investigation','조사 단계');assert(api.snapshot().game.suspicion===0&&api.snapshot().game.trust===0,'조사 상태 초기값');
+}
+function clue(id){api.collect(id);closeInfo();}
+function faith(){api.talk('eli');api.choose(0);advanceAll();api.choose(0);}
+async function audioCheck(){
+  const button=d.querySelector('#bgmButton');assert(button,'BGM 버튼 없음');
+  let a=api.snapshot().audio;assert(a?.available,'이 브라우저에서 오디오 사용 불가');
+  if(!a.enabled)button.click();await until(()=>api.snapshot().audio?.started&&api.snapshot().audio?.state==='running','BGM 시작/재생 실패');
+  a=api.snapshot().audio;assert(a.loop&&a.duration>0&&a.bufferReady&&a.hasSignal&&a.rms>0,'BGM 반복 음원 미준비/무음');const starts=a.starts;
+  button.click();assert(!api.snapshot().audio.enabled&&api.snapshot().audio.targetGain===0,'BGM OFF 실패');button.click();assert(api.snapshot().audio.enabled,'BGM ON 실패');
+  await wait(150);assert(api.snapshot().audio.starts===starts,'BGM 토글마다 음원 재시작');
+  api.go('church',{x:625,y:840});await wait(120);api.go('square',{x:625,y:610});assert(api.snapshot().audio.starts===starts,'일반 맵 이동으로 음악 재시작');
+  log('PASS · BGM 시작·반복 설정·ON/OFF·맵 이동 연속 재생');
+}
+async function walkingCheck(){
+  assert(typeof api.testMove==='function','실제 이동 테스트 훅 없음');api.go('church',{x:625,y:850});
+  let origin=null;for(let y=340;y<1040&&!origin;y+=30)for(let x=590;x<680&&!origin;x+=20){if(Array.from({length:15},(_,i)=>(i-7)*10).every(offset=>api.canWalk(x+offset,y)&&api.canWalk(x,y+offset)))origin={x,y};}
+  assert(origin,'4방향 이동 테스트 공간 없음');
+  for(const [code,direction,dx,dy] of [['KeyW','up',0,-1],['KeyS','down',0,1],['KeyA','left',-1,0],['KeyD','right',1,0]]){
+    api.go('church',origin);const before=api.snapshot();let moved;key(code);
+    try{await until(()=>{moved=api.snapshot();return moved.player.facing===direction&&Math.hypot(moved.player.x-before.player.x,moved.player.y-before.player.y)>0&&moved.walk?.distance>before.walk.distance;},'실제 이동 프레임 대기 실패 '+direction,5000);}finally{key(code,'keyup');}
+    assert(moved.player.facing===direction,'방향 전환 실패 '+direction);assert(Math.hypot(moved.player.x-before.player.x,moved.player.y-before.player.y)>0,'키보드 이동 실패 '+direction);
+    assert(moved.walk?.distance>before.walk.distance,'이동거리 기반 걷기 누락 '+direction);await until(()=>api.snapshot().walk?.moving===false,'정지 후 대기 자세 실패 '+direction,3000);
+    const idle=api.snapshot();assert(idle.player.facing===direction,'정지 후 방향 유지 실패 '+direction);assert(idle.walk.frame===0,'정지 후 기본 걷기 프레임 복귀 실패 '+direction);
+  }
+  // Probe an actual obstacle, away from every exit, to distinguish walls from doors.
+  let wall=null;
+  const exits=w.SAINT_DATA.maps.church.interactions.filter(i=>i.type==='exit');
+  for(let y=300;y<980&&!wall;y+=12)for(let x=230;x<1010&&!wall;x+=12)if(api.canWalk(x,y)&&!api.canWalk(x+8,y)&&exits.every(e=>Math.hypot(e.x-x,e.y-y)>140))wall={x,y};
+  assert(wall,'일반 벽 테스트 위치 없음');api.go('church',wall);for(let i=0;i<10;i++)api.testMove(6,0);assert(api.snapshot().world==='church','일반 벽에서 맵 전환');
+  log('PASS · 실제 WASD 네 방향 이동·걷기 거리·정지 복귀·일반 벽 유지');
+}
+async function portalsCheck(){
+  const P=w.SAINT_PORTALS;assert(P?.definitions&&typeof P.entries==='function','자동 출입구 정의 없음');let count=0;
+  for(const [mapId,map] of Object.entries(w.SAINT_DATA.maps))for(const exit of map.interactions.filter(i=>i.type==='exit')){
+    const def=P.entries(mapId).find(p=>p.id===exit.id);assert(def?.approach&&def.inward,'출입구 접근 좌표 없음 '+mapId+'/'+exit.id);
+    assert(api.go(mapId,def.approach),'출입구 접근 지점 충돌 '+exit.id);await wait(750);
+    for(let i=0;i<85&&api.snapshot().world===mapId;i++){api.testMove(def.inward[0]*4,def.inward[1]*4);if(api.snapshot().busy)await until(()=>!api.snapshot().busy,'문 전환 완료 '+exit.id);}
+    assert(api.snapshot().world===exit.target,'자동 이동 목적지 불일치 '+exit.id+' → '+api.snapshot().world);
+    const dest=api.snapshot(),spawn=exit.spawn;assert(Math.hypot(dest.player.x-spawn.x,dest.player.y-spawn.y)<=60,'도착 위치 오류 '+exit.id);
+    for(let i=0;i<12;i++){api.testMove(def.inward[0]*4,def.inward[1]*4);assert(api.snapshot().world===exit.target,'도착 직후 같은 방향 반복 전환 '+exit.id);}
+    await wait(800);
+    for(let i=0;i<40;i++){api.testMove(def.inward[0]*4,def.inward[1]*4);assert(api.snapshot().world===exit.target,'도착 유예 시간 이후 같은 방향 반복 전환 '+exit.id);}
+    count++;
+  }
+  log('PASS · 실제 출입구 '+count+'개 양방향 자동 이동·도착 좌표·반복 전환 방지');
+}
+async function modalCheck(){
+  d.querySelector('#mapButton').click();await layouts('장소 안내');closeModal('infoModal');
+  api.collect('diary');await layouts('단서 본문');closeInfo();
+  d.querySelector('#journalButton').click();await layouts('탐색 기록');
+  const pages=d.querySelectorAll('#journalEntries .layout-page');if(pages.length>1){const next=d.querySelector('#journalEntries + .layout-page-navigation button:last-child')||[...d.querySelectorAll('.layout-page-navigation button')].find(b=>b.textContent.includes('다음'));if(next&&!next.disabled){next.click();await wait(100);inspectAndCollect('기록 다음 페이지');}}
+  closeModal('journalModal');
+  d.querySelector('#menuButton').click();await layouts('일시정지 메뉴');closeModal('pauseModal');
+}
+async function longestTextCheck(){
+  assert(typeof api.openDialogue==='function','대사 크기 검증 훅 없음');
+  const all=Object.values(w.SAINT_STORY).filter(Array.isArray).flat().filter(p=>p.text&&p.character).sort((a,b)=>b.text.length-a.text.length);
+  const seen=new Set();for(const page of all){if(seen.has(page.character))continue;seen.add(page.character);api.openDialogue([page]);await layouts('긴 대사 '+page.character);advanceAll();if(seen.size===4)break;}
+}
+async function ending(expected,check=true){
+  api.requestRitual();assert(d.querySelector('#infoTitle').textContent.includes('진행'),'의식 확인창');if(check)await layouts('의식 진행 확인');closeInfo();advanceAll();if(expected==='true'){closeInfo();advanceAll();}
+  const c=api.snapshot().cinematic;assert(c?.kind===expected,'컷신 분기 불일치 '+expected);assert(c.victim===(expected==='bad'?'hormasset':'seven'),'희생 대상 불일치');key('KeyE');assert(api.snapshot().cinematic,'E 키로 컷신 오작동');
+  await until(()=>api.snapshot().cinematic?.time>5,'의식 장면 5초 진행');assert(api.snapshot().cinematic.struck===(expected!=='true'),'처형/저지 분기 불일치');
+  await until(()=>api.snapshot().game.phase==='ending'&&!api.snapshot().busy&&!d.querySelector('#endingScreen').hidden,'엔딩 전환 '+expected);
+  assert(api.snapshot().game.ending===expected,'엔딩 불일치');await wait(1200);await layouts(expected+' 엔딩');
+  d.querySelector('#reflectionButton').click();await layouts(expected+' 선택 돌아보기');closeModal('infoModal');log('PASS · '+expected+' 엔딩·의식 장면·선택 기록');
+}
+async function run(){
+  if(running)return;running=true;document.querySelector('#run').disabled=true;out.textContent='';summary.textContent='검증 중';rows=[];errors=[];layoutErrors=[];summary.className='';document.documentElement.dataset.layoutErrors='0';document.documentElement.dataset.result='running';
+  try{
+    bind();await until(()=>{bind();return api?.snapshot().ready;},'게임 이미지/스크립트 로딩');w.addEventListener('error',e=>errors.push(e.message));w.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
+    await resize([1280,720]);await intro(0,true);await audioCheck();await walkingCheck();await portalsCheck();
+    clue('parchment');await modalCheck();await longestTextCheck();clue('restore');clue('bible');clue('bible');assert(api.snapshot().game.suspicion===3,'트루 엔딩 조건');clue('bible');assert(api.snapshot().game.suspicion===3,'단서 중복 상승');await ending('true');
+    await intro(1);clue('parchment');clue('bible');faith();faith();assert(api.snapshot().game.trust===3,'일반 엔딩 조건');await ending('normal',false);
+    await intro(0);clue('parchment');clue('bible');faith();faith();api.talk('elder');advanceAll();assert(api.snapshot().game.trust===4,'배드 엔딩 조건');api.talk('elder');advanceAll();assert(api.snapshot().game.trust===4,'주민 재대화 중복 상승');await ending('bad',false);
+    assert(errors.length===0,'브라우저 오류: '+errors.join(' / '));const appErrors=api.snapshot().errors||[];assert(appErrors.length===0,'게임 오류: '+appErrors.join(' / '));
+    assert(layoutErrors.length===0,'화면 배치 오류 '+layoutErrors.length+'건 · 상세 FAIL 로그를 확인하세요.');
+    renderMetrics();summary.textContent='ALL PASS · 교수 피드백 필수 항목 검증 완료';summary.className='pass';log('ALL PASS');document.documentElement.dataset.result='passed';
+  }catch(e){renderMetrics();summary.textContent='FAIL · '+e.message;summary.className='fail';log('FAIL · '+e.stack);document.documentElement.dataset.result='failed';}
+  finally{running=false;document.querySelector('#run').disabled=false;}
+}
+document.querySelector('#run').onclick=run;
+for(const b of document.querySelectorAll('[data-size]'))b.onclick=()=>{bind();resize(b.dataset.size.split(',').map(Number));};
+window.addEventListener('resize',scalePreview);frame.addEventListener('load',()=>{bind();scalePreview();if(!running)summary.textContent='준비됨 · 전체 검증 실행을 누르세요.';});
+frame.style.width='1280px';frame.style.height='720px';scalePreview();
+</script>
+</html>

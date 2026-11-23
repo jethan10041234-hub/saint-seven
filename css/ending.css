@@ -1,0 +1,34 @@
+/* Illustrated endings preserve the complete image, including portrait ratios. */
+.transition-layer.ending-fade{animation:ending-fade 600ms ease-in both}
+@keyframes ending-fade{from{opacity:0}to{opacity:1}}
+#endingScreen.ending-illustrated{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;align-items:stretch;justify-content:stretch;gap:0;padding:0;background:#10160ee8;overflow:hidden}
+#endingScreen .ending-art{position:relative;min-width:0;min-height:0;display:grid;place-items:center;padding:15px 22px 0;opacity:0;transform:translateY(5px);transition:opacity 900ms ease,transform 900ms ease}
+#endingScreen.ending-visible .ending-art{opacity:1;transform:none}
+#endingIllustration{width:100%;height:100%;min-width:0;min-height:0;display:block;object-fit:contain;object-position:center;image-rendering:auto;filter:drop-shadow(0 8px 18px #0007)}
+#endingScreen .ending-art-fallback{position:absolute;inset:0;display:grid;place-items:center;font-size:15px;color:var(--muted);padding:20px}
+#endingScreen .ending-copy{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:13px;min-width:0;min-height:0;max-height:300px;padding:17px 26px 18px;background:linear-gradient(#17200fdd,#202819);border-top:1px solid #c9aa6066;text-align:center}
+#endingScreen .ending-heading{display:grid;gap:4px;min-width:0}
+#endingScreen #endingType{margin:0;font-size:14px;line-height:1.4;letter-spacing:3px;color:var(--gold)}
+#endingScreen #endingTitle{margin:0;font-size:28px;line-height:1.4;letter-spacing:1px;color:var(--ivory)}
+#endingScreen .ending-reading{min-width:0;min-height:0;display:grid;align-items:center}
+#endingScreen #endingText{font-size:18px;line-height:1.75;max-width:920px;width:100%;margin:0 auto;white-space:pre-line;word-break:keep-all;overflow-wrap:anywhere}
+#endingScreen .ending-navigation,#endingScreen .ending-final-actions{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;min-width:0}
+#endingScreen .ending-navigation .button,#endingScreen .ending-final-actions .button{font-size:14px;line-height:1.5;min-height:38px;padding:7px 13px;min-width:78px;width:auto;margin:0}
+#endingScreen .ending-counter{font-size:13px;line-height:1.5;min-width:58px;color:var(--muted)}
+#endingScreen #endingShowAll{color:var(--muted);background:transparent}
+#endingScreen .ending-final-actions .text-button{font-size:13px;line-height:1.5;padding:6px 10px;color:var(--muted)}
+#endingScreen .ending-questions{display:grid;gap:9px}
+#endingScreen .ending-questions p{margin:0;font-size:17px;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere}
+#endingScreen .ending-questions .ending-reflection-note{font-size:13px;color:var(--gold);letter-spacing:1px}
+#endingScreen .ending-all-text{height:100%;max-height:100%;display:block;text-align:center}
+#endingScreen .ending-all-paragraph{display:block;margin-bottom:10px}
+#endingScreen .ending-all-paragraph:last-child{margin-bottom:0}
+#endingScreen[data-ending-mode=all] .ending-copy{height:300px}
+.ending-caption-enter{animation:ending-caption-enter 350ms ease both}
+@keyframes ending-caption-enter{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(min-height:900px){#endingScreen .ending-copy{max-height:340px;padding:22px 36px;gap:15px}#endingScreen #endingTitle{font-size:32px}#endingScreen #endingText{font-size:20px}#endingScreen .ending-questions p{font-size:19px}#endingScreen[data-ending-mode=all] .ending-copy{height:340px}}
+@media(max-width:800px){#endingScreen .ending-art{padding:10px 12px 0}#endingScreen .ending-copy{padding:12px 14px;gap:9px;max-height:290px}#endingScreen #endingTitle{font-size:23px}#endingScreen #endingType{font-size:12px;letter-spacing:2px}#endingScreen #endingText{font-size:16px;line-height:1.65}#endingScreen .ending-navigation .button,#endingScreen .ending-final-actions .button{font-size:13px;min-height:34px;padding:5px 8px;min-width:62px}#endingScreen .ending-counter{font-size:12px;min-width:49px}#endingScreen .ending-questions p{font-size:15px}#endingScreen .ending-final-actions{gap:5px}#endingScreen .ending-final-actions .text-button{font-size:12px;padding:4px}#endingScreen[data-ending-mode=all] .ending-copy{height:290px}}
+@media(max-width:560px){#endingScreen .ending-copy{padding:12px 10px;gap:8px;max-height:310px}#endingScreen #endingTitle{font-size:21px}#endingScreen #endingText{font-size:16px;line-height:1.6}#endingScreen .ending-navigation{gap:5px}#endingScreen .ending-navigation .button{font-size:12px;padding:5px 7px;min-width:56px}#endingScreen .ending-questions{gap:7px}#endingScreen .ending-questions p{font-size:15px;line-height:1.6}#endingScreen .ending-final-actions .text-button{flex-basis:100%}#endingScreen[data-ending-mode=all] .ending-copy{height:310px}}
+@media(max-height:510px) and (min-width:600px){#endingScreen.ending-illustrated{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr)}#endingScreen .ending-art{padding:9px}#endingScreen .ending-copy{height:100%;max-height:none;padding:10px;gap:8px;border-top:0;border-left:1px solid #c9aa6066;grid-template-rows:auto minmax(0,1fr) auto}#endingScreen #endingTitle{font-size:20px;line-height:1.35}#endingScreen #endingType{font-size:11px;line-height:1.3;letter-spacing:1px}#endingScreen #endingText{font-size:15px;line-height:1.5}#endingScreen .ending-navigation{gap:4px}#endingScreen .ending-navigation .button,#endingScreen .ending-final-actions .button{font-size:11px;min-height:29px;padding:3px 6px;min-width:48px}#endingScreen .ending-counter{font-size:11px;min-width:42px}#endingScreen #endingShowAll{flex-basis:100%;min-height:24px}#endingScreen .ending-questions{gap:6px}#endingScreen .ending-questions p{font-size:14px;line-height:1.45}#endingScreen .ending-questions .ending-reflection-note{font-size:11px}#endingScreen .ending-final-actions{gap:4px}#endingScreen .ending-final-actions .text-button{font-size:11px;padding:3px;flex-basis:100%}#endingScreen[data-ending-mode=all] .ending-copy{height:100%}}
+@media(min-height:511px){#endingScreen[data-ending-mode=all] .ending-copy{height:min(480px,62cqh);max-height:62cqh}}
+@media(prefers-reduced-motion:reduce){#endingScreen .ending-art{transition:none;transform:none}.ending-caption-enter,.transition-layer.ending-fade{animation:none}}

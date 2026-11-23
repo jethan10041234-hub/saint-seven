@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SAINT SEVEN · 작은 화면 검증</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;padding:16px;background:#11170d;color:#f4eedc;font:14px/1.6 monospace}h1{font-size:20px;font-weight:400;margin:0 0 10px;color:#e7cf91}button{padding:9px 15px;border:1px solid #c9aa60;background:#2b321c;color:#f4eedc;font:inherit;cursor:pointer}button:disabled{opacity:.5}nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}#run{background:#c9aa60;color:#1b2011}#summary{display:block;font-size:16px;color:#e7cf91;margin:8px 0}#result{max-height:220px;overflow:auto;white-space:pre-wrap;background:#1b2011;padding:12px;border:1px solid #5b603b;margin:10px 0}#preview{position:relative;width:100%;overflow:hidden;border:1px solid #c9aa60}iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;max-width:none}#inspection{white-space:pre-wrap;color:#d3cdb7;margin:8px 0}details{margin:8px 0}table{border-collapse:collapse;width:100%;font-size:12px}td,th{text-align:left;padding:5px;border:1px solid #5b603b}.pass{color:#bdd29c}.fail{color:#eab09b}
+</style>
+<h1>SAINT SEVEN · 작은 화면 검증</h1>
+<nav><button id="run">작은 화면 검증 실행</button><button data-size="390,844">390 × 844</button><button data-size="844,390">844 × 390</button><button data-size="800,600">800 × 600</button></nav>
+<output id="summary">게임을 불러오는 중입니다.</output>
+<pre id="result" aria-live="polite"></pre>
+<details><summary>해상도별 측정 결과</summary><table><thead><tr><th>장면</th><th>실제 표시 영역</th><th>문서 스크롤</th><th>대사 폰트</th><th>게임 영역</th></tr></thead><tbody id="metrics"></tbody></table></details>
+<p id="inspection"></p><div id="preview"><iframe id="game" title="검증 중인 게임" src="../index.html?__test=1"></iframe></div>
+<script>
+'use strict';
+const frame=document.querySelector('#game'),out=document.querySelector('#result'),summary=document.querySelector('#summary'),metrics=document.querySelector('#metrics'),preview=document.querySelector('#preview');
+const sizes=[[390,844],[844,390],[800,600]],wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+let w,d,api,currentSize=[390,844],running=false,rows=[],errors=[],layoutErrors=[];
+const assert=(v,message)=>{if(!v)throw Error(message);};
+function log(message){out.textContent+=message+'\n';out.scrollTop=out.scrollHeight;}
+async function until(fn,message='기다리기 시간 초과',timeout=22000){const start=performance.now();while(performance.now()-start<timeout){if(fn())return;await wait(40);}throw Error(message);}
+function scalePreview(){const scale=Math.min(1,preview.clientWidth/currentSize[0]);frame.style.transform='scale('+scale+')';preview.style.height=Math.ceil(currentSize[1]*scale)+'px';document.querySelector('#inspection').textContent='게임 내부의 실제 viewport: '+currentSize.join(' × ')+' CSS px / 검토 화면 배율 '+Math.round(scale*100)+'%';}
+async function resize(size){
+  currentSize=[...size];frame.style.width=size[0]+'px';frame.style.height=size[1]+'px';scalePreview();
+  await until(()=>w.innerWidth===size[0]&&w.innerHeight===size[1],'iframe 크기 적용 실패',5000);
+  w.SAINT_LAYOUT?.refresh();
+  // A resized iframe can report its new viewport before the game's scheduled
+  // layout frame runs. Wait for its CSS viewport and two stable rendered frames;
+  // do not wait for overflow to disappear, which would conceal a layout defect.
+  await new Promise((resolve,reject)=>{
+    let request=0,previous='',stable=0,latest=null,finished=false;
+    const finish=error=>{if(finished)return;finished=true;clearTimeout(timeout);w.cancelAnimationFrame(request);error?reject(error):resolve();};
+    const timeout=setTimeout(()=>finish(Error('레이아웃 적용/안정화 시간 초과: '+JSON.stringify({expected:size,actual:latest}))),12000);
+    const sample=()=>{
+      if(finished)return;
+      try{
+        const css=w.getComputedStyle(d.documentElement),body=d.body.getBoundingClientRect();
+        latest={viewport:[w.innerWidth,w.innerHeight],css:[parseFloat(css.getPropertyValue('--app-width')),parseFloat(css.getPropertyValue('--app-height'))],body:[body.width,body.height]};
+        const applied=latest.viewport.every((v,i)=>v===size[i])&&latest.css.every((v,i)=>Math.abs(v-size[i])<1)&&latest.body.every((v,i)=>Math.abs(v-size[i])<1);
+        const geometry=[...d.querySelectorAll('.page,.layout,.game-panel,#stage,#dialogue,#fullFigure,dialog[open]')].filter(rendered).map(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height,el.scrollWidth,el.scrollHeight].map(v=>Math.round(v*100)/100);});
+        const signature=JSON.stringify(geometry);
+        stable=applied&&signature===previous?stable+1:0;previous=signature;
+        if(applied&&stable>=2)return finish();
+        request=w.requestAnimationFrame(sample);
+      }catch(error){finish(error);}
+    };
+    request=w.requestAnimationFrame(sample);
+  });
+}
+function bind(){w=frame.contentWindow;d=w.document;api=w.SAINT_TEST;}
+function rendered(el){if(!el||!el.getClientRects().length)return false;for(let n=el;n&&n.nodeType===1;n=n.parentElement){const s=w.getComputedStyle(n);if(n.hidden||s.display==='none'||s.visibility==='hidden')return false;}return true;}
+function inside(el,label){if(!rendered(el))return;const r=el.getBoundingClientRect(),tol=2;assert(r.left>=-tol&&r.top>=-tol&&r.right<=w.innerWidth+tol&&r.bottom<=w.innerHeight+tol,label+' 화면 이탈: '+JSON.stringify({x:r.x,y:r.y,width:r.width,height:r.height}));}
+function textFits(el,label){if(!rendered(el))return;inside(el,label);assert(el.scrollWidth<=el.clientWidth+2,label+' 가로 글자 잘림: '+el.scrollWidth+' / '+el.clientWidth);assert(el.scrollHeight<=el.clientHeight+2,label+' 세로 글자 잘림: '+el.scrollHeight+' / '+el.clientHeight);}
+function inspectLayout(label){
+  const root=d.documentElement,body=d.body;
+  const x=Math.max(root.scrollWidth,body.scrollWidth)-w.innerWidth,y=Math.max(root.scrollHeight,body.scrollHeight)-w.innerHeight;
+  assert(x<=2&&y<=2,label+' 페이지 스크롤: '+x+' × '+y);
+  for(const selector of ['.page','.masthead','.layout','.sidebar','.game-panel','#stage','#gameCanvas','#dialogue','#portraitWrap','#fullFigure','#titleScreen','#endingScreen','#cinematicCaption','.controls','dialog[open]'])for(const el of d.querySelectorAll(selector))inside(el,label+' '+selector);
+  for(const selector of ['#dialogueText','#speaker','#objective','#locationName','#meterNote','#clueCount','.meter h2','.meter>span','.dialogue-actions button','.scene-bar>span','.sidebar>.button','.controls','#titleScreen>p','#titleScreen>h2','#titleScreen>button','#endingScreen>p','#endingScreen>h2','#endingScreen>button','#cinematicHeading','#cinematicLine','dialog[open] p','dialog[open] h2','dialog[open] h3','dialog[open] button','.layout-page-navigation'])for(const el of d.querySelectorAll(selector))textFits(el,label+' '+selector);
+  const canvas=d.querySelector('#gameCanvas'),cs=w.getComputedStyle(canvas),r=canvas.getBoundingClientRect();
+  assert(cs.imageRendering==='pixelated'||cs.imageRendering==='crisp-edges','픽셀 보간 설정 누락');
+  assert(cs.objectFit==='contain'||Math.abs(r.width/r.height-canvas.width/canvas.height)<.015,'캔버스 종횡비 왜곡');
+  const dialogueFont=parseFloat(w.getComputedStyle(d.querySelector('#dialogueText')).fontSize);
+  if(!d.querySelector('#dialogue').hidden)assert(dialogueFont>=15,'대사 폰트가 작음: '+dialogueFont+'px');
+  for(const [parentSelector,childSelector] of [
+    ['#stage','#dialogue,#titleScreen,#endingScreen,#cinematicCaption'],
+    ['#dialogue','#dialogueText,#speaker,.dialogue-actions button'],
+    ['#titleScreen','p,h2,button'],['#endingScreen','p,h2,button'],
+    ['dialog[open]','p,h2,h3,button,.layout-page:not([hidden])']
+  ])for(const parent of d.querySelectorAll(parentSelector))if(rendered(parent)){
+    const pr=parent.getBoundingClientRect();
+    for(const child of parent.querySelectorAll(childSelector))if(rendered(child)){
+      const cr=child.getBoundingClientRect();
+      assert(cr.left>=pr.left-2&&cr.top>=pr.top-2&&cr.right<=pr.right+2&&cr.bottom<=pr.bottom+2,label+' '+parentSelector+' 내부 이탈: '+(child.id||child.tagName)+' '+JSON.stringify({parent:[pr.x,pr.y,pr.width,pr.height],child:[cr.x,cr.y,cr.width,cr.height]}));
+    }
+  }
+  const sr=d.querySelector('#stage').getBoundingClientRect();
+  rows.push({label,size:currentSize.join(' × '),scroll:x+' / '+y,font:dialogueFont,stage:Math.round(sr.width)+' × '+Math.round(sr.height)});
+}
+function recordLayoutError(label,error){
+  const entry={label,size:currentSize.join(' × '),message:error.message};layoutErrors.push(entry);
+  document.documentElement.dataset.layoutErrors=String(layoutErrors.length);
+  summary.textContent='검증 계속 중 · 화면 오류 '+layoutErrors.length+'건';summary.className='fail';
+  log('FAIL · 화면 '+entry.size+' / '+label+' / '+error.message);
+}
+function inspectAndCollect(label){
+  try{inspectLayout(label);return true;}catch(error){recordLayoutError(label,error);return false;}
+}
+async function layouts(label){
+  const before=layoutErrors.length;
+  for(const size of sizes){await resize(size);inspectAndCollect(label);}
+  if(layoutErrors.length===before)log('PASS · '+label+' / 모든 해상도 경계·글자·비율');
+  else log('FAIL · '+label+' / 화면 오류 '+(layoutErrors.length-before)+'건 기록, 다음 장면 검증 계속');
+}
+function renderMetrics(){metrics.replaceChildren();for(const r of rows){const tr=document.createElement('tr');for(const value of [r.label,r.size,r.scroll,r.font+' px',r.stage]){const td=document.createElement('td');td.textContent=value;tr.append(td);}metrics.append(tr);}}
+function key(code,type='keydown'){d.querySelector('#gameCanvas').dispatchEvent(new w.KeyboardEvent(type,{code,bubbles:true}));}
+function closeInfo(){const m=d.querySelector('#infoModal');if(m.open)d.querySelector('#infoActions button').click();}
+function closeModal(id){const m=d.getElementById(id);if(m.open){key('Escape');assert(!m.open,id+' 닫기 실패');}}
+function advanceAll(){for(let i=0;i<100;i++){const s=api.snapshot();if(!s.dialogue||s.busy)break;if(s.dialogue.index===s.dialogue.total-1&&s.dialogue.choices.length)break;api.advance();}}
+async function intro(choice,check=false){
+  api.reset();if(check)await layouts('타이틀');api.start();if(check)await layouts('엘리 대화·초상화');
+  const cast=api.snapshot().cast.join(',');assert(new Set(api.snapshot().cast).size===6,'주민 외형 중복');advanceAll();
+  await until(()=>api.snapshot().dialogue?.total===4&&!api.snapshot().busy,'미사 후 개인 대화');advanceAll();if(check)await layouts('진행 안내창');closeInfo();
+  assert(api.snapshot().game.phase==='seven','세븐 만남 단계');api.go('entrance',{x:501,y:290});api.interact();if(check)await layouts('세븐 대화·초상화');advanceAll();
+  await until(()=>api.snapshot().game.phase==='gossip'&&!api.snapshot().busy,'세븐 퇴장 완료');advanceAll();closeInfo();
+  api.go('square',{x:455,y:365});assert(api.snapshot().cast.join(',')===cast,'맵 이동 후 주민 외형 변동');api.interact();advanceAll();
+  assert(api.snapshot().game.phase==='elder','주민 소문 단계');api.go('square',{x:925,y:720});api.interact();advanceAll();
+  assert(api.snapshot().dialogue.choices.length===2,'네/침묵 선택지 유지');if(check)await layouts('네·침묵 선택지');api.choose(choice);advanceAll();closeInfo();
+  assert(api.snapshot().game.phase==='investigation','조사 단계');assert(api.snapshot().game.suspicion===0&&api.snapshot().game.trust===0,'조사 상태 초기값');
+}
+function clue(id){api.collect(id);closeInfo();}
+function faith(){api.talk('eli');api.choose(0);advanceAll();api.choose(0);}
+async function longestTextCheck(){
+  assert(typeof api.openDialogue==='function','대사 크기 검증 훅 없음');
+  const all=Object.values(w.SAINT_STORY).filter(Array.isArray).flat().filter(p=>p.text&&p.character).sort((a,b)=>b.text.length-a.text.length);
+  const seen=new Set();for(const page of all){if(seen.has(page.character))continue;seen.add(page.character);api.openDialogue([page]);await layouts('긴 대사 '+page.character);advanceAll();if(seen.size===4)break;}
+}
+async function ending(expected,check=true){
+  api.requestRitual();assert(d.querySelector('#infoTitle').textContent.includes('진행'),'의식 확인창');if(check)await layouts('의식 진행 확인');closeInfo();advanceAll();if(expected==='true'){closeInfo();advanceAll();}
+  const c=api.snapshot().cinematic;assert(c?.kind===expected,'컷신 분기 불일치 '+expected);assert(c.victim===(expected==='bad'?'hormasset':'seven'),'희생 대상 불일치');key('KeyE');assert(api.snapshot().cinematic,'E 키로 컷신 오작동');
+  await until(()=>api.snapshot().cinematic?.time>5,'의식 장면 5초 진행');assert(api.snapshot().cinematic.struck===(expected!=='true'),'처형/저지 분기 불일치');
+  await until(()=>api.snapshot().game.phase==='ending'&&!api.snapshot().busy&&!d.querySelector('#endingScreen').hidden,'엔딩 전환 '+expected);
+  assert(api.snapshot().game.ending===expected,'엔딩 불일치');await wait(1200);await layouts(expected+' 엔딩');
+  d.querySelector('#reflectionButton').click();await layouts(expected+' 선택 돌아보기');closeModal('infoModal');log('PASS · '+expected+' 엔딩·의식 장면·선택 기록');
+}
+
+function normalizeText(text){return text.replace(/\s+/gu,'');}
+async function paginatedLayouts(containerId,label,originalTexts=[]){
+  const errorsBefore=layoutErrors.length;
+  for(const size of sizes){
+    await resize(size);
+    const container=d.getElementById(containerId),nav=d.querySelector('.layout-page-navigation[data-for="'+containerId+'"]');
+    const previous=nav?.querySelector('button:first-child'),next=nav?.querySelector('button:last-child');
+    let safety=0;while(previous&&!previous.disabled&&safety++<80){previous.click();await resize(size);}
+    assert(safety<80,label+' 이전 페이지 반복');
+    const expectedPages=container.querySelectorAll('.layout-page').length||1,visited=[];
+    for(let page=0;page<expectedPages;page++){
+      inspectAndCollect(label+' '+(page+1)+'/'+expectedPages);
+      const active=[...container.querySelectorAll('.layout-page')].filter(rendered);
+      assert(active.length===1,label+' 활성 페이지 개수 오류');
+      const state=w.SAINT_LAYOUT.snapshot().modals.find(m=>m.id===containerId);
+      if(state&&active[0].getBoundingClientRect().height>state.budget+2)recordLayoutError(label+' '+(page+1)+'/'+expectedPages,Error('페이지 높이 예산 초과: '+active[0].getBoundingClientRect().height+' / '+state.budget));
+      visited.push(active[0].textContent);
+      if(page+1<expectedPages){assert(next&&!next.disabled,label+' 다음 페이지 접근 불가');next.click();await resize(size);}
+    }
+    const allText=normalizeText(visited.join(''));
+    for(const text of originalTexts)assert(allText.includes(normalizeText(text)),label+' 페이지 이동 중 원문 누락: '+text.slice(0,25));
+    if(next)assert(next.disabled,label+' 마지막 페이지 버튼 상태 오류');
+  }
+  if(layoutErrors.length===errorsBefore)log('PASS · '+label+' / 세 해상도 모든 페이지·원문 보존');
+  else log('FAIL · '+label+' / 화면 오류 '+(layoutErrors.length-errorsBefore)+'건 기록, 원문 보존 검사 완료');
+}
+async function compactModals(){
+  d.querySelector('#mapButton').click();
+  const mapText=d.querySelector('#infoContent').textContent;
+  await paginatedLayouts('infoContent','장소 안내',[mapText]);closeModal('infoModal');
+  d.querySelector('#menuButton').click();await layouts('일시정지 메뉴');
+  d.querySelector('#pauseHelp').click();
+  const helpText=d.querySelector('#infoContent').textContent;
+  await paginatedLayouts('infoContent','조작 안내',[helpText]);closeModal('infoModal');closeModal('pauseModal');
+  d.querySelector('#journalButton').click();
+  const originals=api.snapshot().game.found.filter(id=>w.SAINT_DATA.clues[id]).map(id=>w.SAINT_DATA.clues[id].text);
+  assert(originals.length>=6,'긴 기록을 위한 실제 단서가 충분하지 않음');
+  await paginatedLayouts('journalEntries','전체 탐색 기록',originals);closeModal('journalModal');
+}
+async function run(){
+  if(running)return;running=true;for(const b of document.querySelectorAll('nav button'))b.disabled=true;
+  out.textContent='';summary.textContent='작은 화면 검증 중';rows=[];errors=[];layoutErrors=[];summary.className='';document.documentElement.dataset.layoutErrors='0';document.documentElement.dataset.result='running';
+  try{
+    bind();await until(()=>{bind();return api?.snapshot().ready;},'게임 이미지/스크립트 로딩');
+    w.addEventListener('error',e=>errors.push(e.message));w.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
+    await resize([390,844]);await intro(0,true);
+    clue('parchment');api.collect('diary');await paginatedLayouts('infoContent','세븐의 일기장 원문',[w.SAINT_DATA.clues.diary.text]);closeInfo();
+    clue('restore');clue('bible');clue('bible');api.talk('elder');advanceAll();
+    await compactModals();
+    api.talk('eli');await layouts('사제 질문 선택지');api.choose(0);advanceAll();await layouts('긴 판단 선택지');api.choose(1);
+    await longestTextCheck();assert(api.snapshot().game.suspicion===3,'트루 엔딩 조건');await ending('true');
+    await intro(1);clue('parchment');clue('bible');faith();faith();await ending('normal',false);
+    await intro(0);clue('parchment');clue('bible');faith();faith();api.talk('elder');advanceAll();await ending('bad',false);
+    assert(errors.length===0,'브라우저 오류: '+errors.join(' / '));const appErrors=api.snapshot().errors||[];assert(appErrors.length===0,'게임 오류: '+appErrors.join(' / '));
+    assert(layoutErrors.length===0,'화면 배치 오류 '+layoutErrors.length+'건 · 상세 FAIL 로그를 확인하세요.');
+    renderMetrics();summary.textContent='ALL PASS · 소형 세 해상도 대화·선택지·전체 기록·세 엔딩';summary.className='pass';log('ALL PASS');document.documentElement.dataset.result='passed';
+  }catch(e){renderMetrics();summary.textContent='FAIL · '+e.message;summary.className='fail';log('FAIL · '+e.stack);document.documentElement.dataset.result='failed';}
+  finally{running=false;for(const b of document.querySelectorAll('nav button'))b.disabled=false;}
+}
+document.querySelector('#run').onclick=run;
+for(const b of document.querySelectorAll('[data-size]'))b.onclick=async()=>{bind();try{await resize(b.dataset.size.split(',').map(Number));inspectLayout('수동 확인');renderMetrics();}catch(e){summary.textContent='FAIL · '+e.message;log('FAIL · '+e.stack);}};
+window.addEventListener('resize',scalePreview);frame.addEventListener('load',()=>{bind();scalePreview();if(!running)summary.textContent='준비됨 · 작은 화면 검증 실행을 누르세요.';});
+frame.style.width='390px';frame.style.height='844px';scalePreview();
+</script>
+</html>

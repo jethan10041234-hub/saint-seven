@@ -1,0 +1,66 @@
+PASS 25 real WAV files exposed, six music pieces and two ambience loops
+PASS no autoplay or context allocation before input
+PASS gesture synchronously resumes a single context
+PASS real WAV-backed church music and room ambience start exactly once
+PASS same music category preserves source and playhead
+PASS outdoor scene crossfades once and shared maps do not restart
+PASS 47 actual pixels do not prematurely trigger a footfall
+PASS 48px cadence alternates feet with small natural variation
+PASS standing, turning, and blocked movement stop tails without new steps
+PASS pause/resume retains gait phase for sprite synchronization
+PASS teleport distances and map mismatches never create steps
+PASS stopping cancels asynchronous footfall loads and active tails
+PASS five distinct material assets and neutral fallback play
+PASS interaction cues play and syllables are rate limited
+PASS real church door settles once after 340ms through SFX channel
+PASS rapid door replacement cancels previous close
+PASS arriving in another map cancels stale close
+PASS ordinary paths never invent a closing door
+PASS returning to title cancels closing-door timer
+PASS muting effects cancels a pending close even if reenabled quickly
+PASS dialogue lowers music and ambient gain
+PASS event duck has a scheduled recovery
+PASS duck expires by audio clock
+PASS master mute is independent of channel choices and persistent
+PASS unmute keeps existing music source
+PASS independent channel controls alter actual gain targets
+PASS ritual progressively reveals upper dissonant strings
+PASS ritual buildup has deliberate near-strike musical silence
+PASS distinct normal ending score
+PASS distinct bad ending score
+PASS distinct true ending score
+PASS hidden tab suspends without advancing loop clock
+PASS rare ambient cues schedule once, without accumulated backlog
+PASS master control on title does not restart gameplay music
+PASS dispose tears down audio, pending doors, and ambience timer
+PASS embedded playback has audible data and correct provenance
+PASS offline playback has audible data and correct provenance
+PASS missing playback has audible data and correct provenance
+PASS missing AudioContext and denied storage never interrupt game
+
+39 audio regression checks passed.
+✔ v06_work/SAINT_SEVEN_v06/tests/audio.test.cjs (6067.165909ms)
+✔ raw world, map, character and scene structure still matches original v0.5 (8.637796ms)
+✔ apply changes only authorized prose; all maps, characters, speakers and villager slots survive (7.982251ms)
+✔ all 36 ending thresholds and every existing score effect are unchanged (0.429967ms)
+✔ an observed but unaccepted Bible permits cover judgment without adding trust (0.490889ms)
+✔ actual document reading is score-free and unaccepted materials remain available to judge later (4.249424ms)
+✔ normal ending acknowledges an accepted elder pledge, but never invents one from observation (8.138215ms)
+✔ all endings retain independent captions and one or two non-graded reflection questions (2.274141ms)
+✔ all 12 real thresholds are reachable and retain original routes/spawns (9.139682ms)
+✔ 36 story gates match original phases; denied doors show one hint per approach (24.815138ms)
+✔ 24 adjacent doorway edges do not trigger; idle and outward movement do not trigger (2.076465ms)
+✔ actual movement into nearby solid walls never changes maps (6.645799ms)
+✔ 1,200 stationary arrival samples cannot bounce, including after cooldown (8.036261ms)
+✔ holding north on both stairs never bounces; leaving the threshold re-arms return (8.017463ms)
+✔ failed destination collision preserves source map; reset clears portal state (1.677074ms)
+PASS: 36 ending boundaries, clue prerequisites, deduplication, three reachable endings, cap and phase guard.
+✔ v06_work/SAINT_SEVEN_v06/tests/rules.test.cjs (75.269078ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6078.875878

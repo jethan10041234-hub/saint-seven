@@ -1,0 +1,13 @@
+{
+  "baseline": "v0.5",
+  "originalAssetsChecked": 35,
+  "unchanged": 35,
+  "changed": [],
+  "coreFilesUnchanged": {
+    "data.js": true,
+    "story.js": true,
+    "sprites.js": true,
+    "portals.js": true,
+    "cinematic.js": true
+  }
+}

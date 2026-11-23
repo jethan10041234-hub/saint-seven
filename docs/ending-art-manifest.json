@@ -1,0 +1,17 @@
+[
+  {
+    "file": "assets/endings/bad.png",
+    "bytes": 2839281,
+    "sha256": "900c7f85bd7258101b0462d6c680bf56a35e0e340e5e11f50df5530570a5fa46"
+  },
+  {
+    "file": "assets/endings/normal.png",
+    "bytes": 3058041,
+    "sha256": "5c1593174a39fb1b74b803a5f67af672ade71910b01e0db76a118e6842522a13"
+  },
+  {
+    "file": "assets/endings/true.png",
+    "bytes": 3400062,
+    "sha256": "4f80cc1d414effd8e9cd13d78f8fd73b209180a1e1fea8332678b53c7f49a63c"
+  }
+]
